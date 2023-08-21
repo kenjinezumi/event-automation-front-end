@@ -1,0 +1,11 @@
+/* styles.css */
+.google-footer {
+    background-color: black;
+    padding: 10px 0;
+    text-align: center;
+  }
+  
+  .google-footer p {
+    margin: 0;
+    font-size: 14px;
+  }
