@@ -15,7 +15,7 @@ import { sendApiAlgoCall } from "./apis/algo";
 
 
 import {Event, EventFormProps, EventFormData, EventAlgoData} from "../entities/events"
-import {fetchIndustries, fetchFunctions, fetchAccount, fetchSeniority, fetchCountry } from "./apis/fetch"
+import {fetchIndustries, fetchFunctions, fetchAccount, fetchSeniority, fetchCountry, fetchBdrs } from "./apis/fetch"
 
 
 
@@ -52,11 +52,13 @@ export default function EventForm({
 
   const [accounts, setAccounts] = useState<string[]>([]);
   const [accounts_selected, setAccountsSelected] = useState<string[]>([]);
-  const [eventBdr, setEventBdr] = useState("");
+  const [eventBdrSelected, setEventBdrSelected] = useState("");
+  const [eventBdr, setEventBdr] = useState<string[]>([]);
 
   const [subjectLine, setSubjectLine] = useState("");
   const [bodyText, setBodyText] = useState("");
   const [sendDatetime, setSendDatetime] = useState<dayjs.Dayjs | null>(null);
+  const [eventDatetime, setEventDatetime] = useState<dayjs.Dayjs | null>(null);
 
   const [showEvents, setShowEvents] = useState(false);
   const [showTarget, setShowTarget] = useState(false);
@@ -78,10 +80,6 @@ export default function EventForm({
     seniority: string;
     job_function: string;
     email: string; 
-  }
-  interface ContactTableProps {
-    showFilteredContacts: boolean;
-    filteredContacts: Contact[];
   }
 
 
@@ -118,7 +116,10 @@ export default function EventForm({
       const uniqueFunctions = await fetchFunctions(); 
       const uniqueSeniority = await fetchSeniority();
       const uniqueAccounts = await fetchAccount(); 
-      const uniqueCountries = await fetchCountry();     
+      const uniqueCountries = await fetchCountry();   
+      const uniqueBdrs = await fetchBdrs();     
+  
+      setEventBdr(uniqueBdrs);
       setIndustries(uniqueIndustries);
       setFunctions(uniqueFunctions);
       setSeniority(uniqueSeniority);
@@ -179,22 +180,24 @@ export default function EventForm({
     ) {
       const eventData: EventFormData = {
         accounts: accounts_selected,
-        event_id: 0,
+        event_id: eventId,
         event_name: eventName,
         registration_page_url: registrationPageUrl,
         event_date: selectedDate,
         event_location: location_selected,
         maximum_capacity: maxCapacity,
-        contact: eventBdr,
+        contact: eventBdrSelected,
         target_audience: {
           seniority: seniority_selected,
           industries: industries_selected,
           functions: functions_selected,
         },
         event_copy: {
+          send_time: sendDatetime,
           subjectLine: subjectLine,
           bodyText: bodyText,
         },
+        contact_lists: selectedContactIds
       };
 
       // Call onSubmit to handle form data
@@ -253,6 +256,20 @@ export default function EventForm({
               onChange={(e) => setEventId(e.target.value)}
               margin="normal"
               variant="outlined"
+            />
+            <TextField
+              label="Event date"
+              type="datetime-local"
+              value={
+                eventDatetime ? eventDatetime.format("YYYY-MM-DDTHH:mm") : ""
+              }
+              onChange={(e) => setEventDatetime(dayjs(e.target.value))}
+              fullWidth
+              margin="normal"
+              variant="outlined"
+              InputLabelProps={{
+                shrink: true,
+              }}
             />
             <TextField
               label="Registration Page URL"
@@ -430,8 +447,27 @@ export default function EventForm({
             Email
           </Button>
         </div>
+
         {showEmail && (
           <div>
+            <label>Sender:</label>
+           
+            <Select
+              fullWidth
+              displayEmpty
+              renderValue={(selected) =>
+                selected.length === 0 ? "Select BDR" : selected
+              }
+              value={eventBdrSelected}
+              onChange={(e) => setEventBdrSelected(e.target.value)}
+              variant="outlined"
+            >
+              {eventBdr.map((bdr) => (
+                <MenuItem key={bdr} value={bdr}>
+                  {bdr}
+                </MenuItem>
+              ))}
+            </Select>
            <label>Recipients:</label>
             <input
               type="text"

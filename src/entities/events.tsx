@@ -14,7 +14,7 @@ export interface EventFormProps {
   
   export interface EventFormData {
     accounts: string[],
-    event_id: number;
+    event_id: string;
     event_name: string;
     registration_page_url: string;
     event_date: dayjs.Dayjs;
@@ -27,9 +27,12 @@ export interface EventFormProps {
       functions: string[];
     };
     event_copy: {
+      send_time: dayjs.Dayjs | null;
       subjectLine: string;
       bodyText: string;
     };
+    contact_lists: string[]
+
   }
 
   export interface EventAlgoData{
