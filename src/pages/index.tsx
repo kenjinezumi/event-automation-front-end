@@ -5,6 +5,7 @@ import EventForm from '../components/EventForm';
 import Footer from '../components/Footer';
 import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid'; // Import Grid component
+import axios from 'axios';
 
 import { Event } from '../entities/events';
 import dayjs from 'dayjs';
@@ -31,14 +32,31 @@ const HomePage: React.FC = () => {
     setSelectedDate(date);
   };
 
+  function MyCalendar() {
+    const [selectedDate, setSelectedDate] = useState(null);
+    const [events, setEvents] = useState([]);
+  
+    const handleCalendarDayClick = async (date: any) => {
+      setSelectedDate(date);
+  
+      try {
+        const response = await axios.get(`http://127.0.0.1:8000/api/events/${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}/`);
+        setEvents(response.data);
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      }
+    };
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
     <Header />
     <Container maxWidth="lg" style={{ flex: 1 }}>
       <Grid container spacing={2}>
         <Grid item xs={12} md={6} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        {selectedDate && <p style={{ marginTop: '1rem' }}>Selected Date: {selectedDate?.format('YYYY-MM-DD')}</p>}
+
           <CalendarComponent onDateChange={handleDateChange} />
-          {selectedDate && <p style={{ marginTop: '1rem' }}>Selected Date: {selectedDate?.format('YYYY-MM-DD')}</p>}
         </Grid>
         <Grid item xs={12} md={6}>
         {!selectedDate && (
