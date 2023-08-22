@@ -6,42 +6,34 @@ import {
   Select,
   MenuItem,
   TextareaAutosize,
+  Checkbox
 } from "@mui/material";
 import { InputLabel } from "@mui/material";
 import dayjs from "dayjs";
 import { handleAddEvent } from "./apis/events";
+import { sendApiAlgoCall } from "./apis/algo";
 
-interface EventFormProps {
-  selectedDate: dayjs.Dayjs;
-  onDateChange: (date: dayjs.Dayjs | null) => void;
-  onSubmit: (eventData: EventFormData) => void;
-}
 
-interface EventFormData {
-  accounts: string[],
-  event_id: number;
-  event_name: string;
-  registration_page_url: string;
-  event_date: dayjs.Dayjs;
-  event_location: string;
-  maximum_capacity: number;
-  contact: string;
-  target_audience: {
-    seniority: string[];
-    industries: string[];
-    functions: string[];
-  };
-  event_copy: {
-    subjectLine: string;
-    bodyText: string;
-  };
-}
+import {Event, EventFormProps, EventFormData, EventAlgoData} from "../entities/events"
+import {fetchIndustries, fetchFunctions, fetchAccount, fetchSeniority, fetchCountry } from "./apis/fetch"
+
+
 
 export default function EventForm({
   selectedDate,
   onDateChange,
   onSubmit,
 }: EventFormProps) {
+
+  
+  interface FilteredContact {
+    contact_id: string;
+    account__account_id: string;
+    name: string;
+    seniority: string;
+    job_function: string;
+    email: string;
+  }
   const [eventName, setEventName] = useState("");
   const [eventId, setEventId] = useState("");
   const [registrationPageUrl, setRegistrationPageUrl] = useState("");
@@ -71,74 +63,106 @@ export default function EventForm({
   const [showEmail, setShowEmail] = useState(false);
   const [showSales, setShowSales] = useState(false);
 
+  const [filteredContacts, setFilteredContacts] = useState<FilteredContact[]>([]);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]); 
+  const [showFilteredContacts, setShowFilteredContacts] = useState(false);
+  const [recipients, setRecipients] = useState<string[]>([]); 
+
+  const [exceededMaxCapacity, setExceededMaxCapacity] = useState(false);
+
+
+  interface Contact {
+    contact_id: string;
+    name: string;
+    account__account_id: string;
+    seniority: string;
+    job_function: string;
+    email: string; 
+  }
+  interface ContactTableProps {
+    showFilteredContacts: boolean;
+    filteredContacts: Contact[];
+  }
+
+
+
+  const handleCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>, contactId: string, email: string) => {
+    const isChecked = event.target.checked;
+  
+    if (isChecked) {
+      if (selectedContactIds.length < maxCapacity) {
+        setSelectedContactIds((prevSelectedIds) => [...prevSelectedIds, contactId]);
+        setRecipients((prevRecipients) => [...prevRecipients, email]);
+        setExceededMaxCapacity(false); // Reset the exceeded capacity state
+      } else {
+        setExceededMaxCapacity(true); // Set exceeded capacity state to true
+      }
+    } else {
+      setSelectedContactIds((prevSelectedIds) =>
+        prevSelectedIds.filter((id) => id !== contactId)
+      );
+      setRecipients((prevRecipients) =>
+        prevRecipients.filter((recipient) => recipient !== email)
+      );
+      setExceededMaxCapacity(false); // Reset the exceeded capacity state
+    }
+  };
+  
+ 
+
   useEffect(() => {
     // Fetch industries when the component mounts
-    async function fetchIndustries() {
-      try {
-        const response = await fetch("http://127.0.0.1:8000/api/industries/");
-        const jsonData = await response.json();
-        const uniqueIndustries = jsonData.industries;
-
-        setIndustries(uniqueIndustries);
-      } catch (error) {
-        console.error("Error fetching industries:", error);
-      }
+    
+    async function fetchData(){
+      const uniqueIndustries =  await fetchIndustries();
+      const uniqueFunctions = await fetchFunctions(); 
+      const uniqueSeniority = await fetchSeniority();
+      const uniqueAccounts = await fetchAccount(); 
+      const uniqueCountries = await fetchCountry();     
+      setIndustries(uniqueIndustries);
+      setFunctions(uniqueFunctions);
+      setSeniority(uniqueSeniority);
+      setAccounts(uniqueAccounts);
+      setLocation(uniqueCountries);
     }
+    fetchData();
 
-    async function fetchFunctions() {
-      try {
-        const response = await fetch("http://127.0.0.1:8000/api/functions/");
-        const jsonData = await response.json();
-        const uniqueFunctions = jsonData.job_function;
-
-        setFunctions(uniqueFunctions);
-      } catch (error) {
-        console.error("Error fetching functions:", error);
-      }
-    }
-
-    async function fetchAccount() {
-      try {
-        const response = await fetch("http://127.0.0.1:8000/api/accounts/");
-        const jsonData = await response.json();
-        const uniqueAccounts = jsonData.account_id;
-
-        setAccounts(uniqueAccounts);
-      } catch (error) {
-        console.error("Error fetching accounts:", error);
-      }
-    }
-
-    async function fetchSeniority() {
-      try {
-        const response = await fetch("http://127.0.0.1:8000/api/seniority/");
-        const jsonData = await response.json();
-        const uniqueSeniority = jsonData.seniority;
-
-        setSeniority(uniqueSeniority);
-      } catch (error) {
-        console.error("Error fetching seniority", error);
-      }
-    }
-
-    async function fetchCountry() {
-      try {
-        const response = await fetch("http://127.0.0.1:8000/api/countries/");
-        const jsonData = await response.json();
-        const uniqueCountries = jsonData.country;
-
-        setLocation(uniqueCountries);
-      } catch (error) {
-        console.error("Error fetching countries", error);
-      }
-    }
-
-    fetchIndustries();
-    fetchFunctions();
-    fetchSeniority();
-    fetchAccount();
-    fetchCountry();
   }, []);
+
+  async function fetchSuggestions(algoEventData: any) {
+    const results = await sendApiAlgoCall(algoEventData);
+    return results;
+  }
+
+
+  useEffect(() => {
+
+   
+    // Define an async function within useEffect
+    async function fetchData() {
+      if (location_selected && maxCapacity && industries_selected.length > 0 && functions_selected.length > 0) {
+        const algoData: EventAlgoData = {
+          event_location: location_selected,
+          maximum_capacity: maxCapacity,
+          target_audience: {
+            seniority: seniority_selected,
+            industries: industries_selected,
+            functions: functions_selected,
+          },
+        };
+  
+        const response = await fetchSuggestions(algoData);
+        setFilteredContacts(JSON.parse(response['filtered_contacts'])); 
+        setShowFilteredContacts(true);
+
+      }
+    }
+  
+    // Call the async function
+    fetchData();
+  
+  }, [location_selected, maxCapacity, seniority_selected, industries_selected, functions_selected]);
+  
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,7 +208,7 @@ export default function EventForm({
         setEventName("");
         setEventId("");
         setRegistrationPageUrl("");
-        setLocation("");
+        setLocation([]);
         setMaxCapacity(20);
         setSeniority([]);
         setIndustries([]);
@@ -192,6 +216,7 @@ export default function EventForm({
         setSubjectLine("");
         setBodyText("");
         setSendDatetime(null);
+        setFilteredContacts([]);
       } else {
         // Handle error case
       }
@@ -346,38 +371,53 @@ export default function EventForm({
             onClick={() => setShowSales(!showSales)}
             style={{ marginBottom: "8px", marginTop: "8px" }}
           >
-            Business Development Representative
+            Target Accounts
           </Button>
         </div>
         {showSales && (
           <div>
-            <TextField
-              label="Business Development representative"
-              fullWidth
-              value={eventBdr}
-              onChange={(e) => setEventBdr(e.target.value)}
-              margin="normal"
-              variant="outlined"
-            />
-          <InputLabel>Accounts</InputLabel>
-          <Select
-            fullWidth
-            multiple
-            displayEmpty
-            renderValue={(selected) =>
-              selected.length === 0 ? "Select accounts" : selected.join(", ")
-            }
-            value={accounts_selected}
-            onChange={(e) => setAccountsSelected(e.target.value as string[])}
-            variant="outlined"
-          >
-            {accounts.map((account) => (
-              <MenuItem key={account} value={account}>
-                {account}
-              </MenuItem>
-            ))}
-          </Select>
+          {showFilteredContacts && (
+            <div>
+              <div style={{ overflowY: 'auto', maxHeight: '400px' }}> 
+              {exceededMaxCapacity && (
+  <p>You've exceeded the limit of {maxCapacity} recipients.</p>
+)}
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Select</th>
+                      <th>Name</th>
+                      <th>Account ID</th>
+                      <th>Seniority</th>
+                      <th>Job Function</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredContacts.map((contact: any) => (
+                      <tr key={contact.contact_id}>
+                        <td>
+                         <input
+                      type="checkbox"
+                      checked={selectedContactIds.includes(contact.contact_id)}
+                      onChange={(event) =>
+                        handleCheckboxChange(event, contact.contact_id, contact.email)
+                      }
+                    />
+                        </td>
+                        <td>{contact.name}</td>
+                        <td>{contact.account__account_id}</td>
+                        <td>{contact.seniority}</td>
+                        <td>{contact.job_function}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
+        
+          
       )}
 
         <div>
@@ -392,6 +432,16 @@ export default function EventForm({
         </div>
         {showEmail && (
           <div>
+           <label>Recipients:</label>
+            <input
+              type="text"
+              value={recipients.join(', ')} // Display recipients as comma-separated list
+              readOnly
+              style={{ width: '100%' }}
+            />
+            {selectedContactIds.length > maxCapacity && (
+              <p>You're over the limit of {maxCapacity} recipients.</p>
+            )}
             <TextField
               label="Email Subject Line"
               fullWidth
